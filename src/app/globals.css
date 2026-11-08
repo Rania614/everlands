@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+@theme {
+  --color-sky: #8eb8d2;
+  --color-meadow: #a7c8a5;
+  --color-forest: #789d84;
+  --color-lilac: #b9a1d3;
+  --color-gold: #e5c58f;
+  --color-coral: #e7a99c;
+  --color-cream: #f3e9d7;
+  --color-twilight: #8292b2;
+
+  /* Readable text tones derived from twilight blue */
+  --color-ink: #2f3a56;
+  --color-ink-soft: #55607d;
+  --color-paper: #fbf7ef;
+
+  --font-sans: "Nunito Variable", ui-rounded, system-ui, sans-serif;
+  --font-display: "Fredoka Variable", "Nunito Variable", ui-rounded, system-ui, sans-serif;
+
+  --shadow-soft: 0 10px 30px -12px rgb(47 58 86 / 0.35), 0 2px 6px -2px rgb(47 58 86 / 0.12);
+  --shadow-lift: 0 18px 40px -16px rgb(47 58 86 / 0.45);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  background: #cfe2ec;
+  overscroll-behavior: none;
+}
+
+/* Sky behind the transparent WebGL canvas */
+.everlands-sky {
+  background:
+    radial-gradient(ellipse 60% 45% at 50% 38%, rgb(255 246 226 / 0.85), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 85% 10%, rgb(185 161 211 / 0.45), transparent 70%),
+    radial-gradient(ellipse 45% 35% at 10% 90%, rgb(231 169 156 / 0.35), transparent 70%),
+    linear-gradient(180deg, #a9cbe0 0%, #c6dcea 45%, #ead9cf 100%);
+}
+
+.glass {
+  background: rgb(251 247 239 / 0.86);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border: 1px solid rgb(255 255 255 / 0.7);
+}
+
+:focus-visible {
+  outline: 3px solid #8292b2;
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(130 146 178 / 0.5) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.label-pill {
+  pointer-events: none;
+  white-space: nowrap;
+  user-select: none;
+}
