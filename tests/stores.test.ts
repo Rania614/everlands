@@ -5,7 +5,7 @@ import { addDays, weekKeyOf } from "@/lib/dates";
 import { confirmPlan, levelAt, syncWeeks } from "@/lib/lifecycle";
 import { computeWeekProgress, weekTarget } from "@/lib/progression";
 import { occurrencesInRange } from "@/lib/recurrence";
-import { addTask, completeTask, moveTask, removeTask, reopenTask } from "@/lib/taskActions";
+import { addTask, completeTask, moveTask, removeTask, reopenTask, updateTask } from "@/lib/taskActions";
 import { useCalendarStore } from "@/stores/calendarStore";
 import { useCourseStore } from "@/stores/courseStore";
 import { usePlanStore } from "@/stores/planStore";
@@ -235,5 +235,38 @@ describe("planning grace period", () => {
     assert.equal(usePlanStore.getState().plans[SAT].status, "planning");
     syncWeeks(at(addDays(tue, 1), 8));
     assert.equal(usePlanStore.getState().plans[SAT].status, "active");
+  });
+});
+
+describe("UX milestone regressions: inline confirmations keep the plan rules", () => {
+  beforeEach(reset);
+
+  it("an inline plan choice in Quick Add needs no dialog but is still logged", async () => {
+    syncWeeks(at(SAT));
+    confirmPlan(SAT);
+    const t = await addTask({ title: "Inline extra", locationId: "castle", durationMin: 20, slot: "evening", weekKey: SAT, date: SAT, effort: "M", kind: "supporting", planStatus: "extra" });
+    assert.equal(asked.length, 0);
+    assert.equal(t?.planStatus, "extra");
+    assert.equal(weekTarget(useQuestStore.getState().quests, SAT), 14);
+    assert.equal(usePlanStore.getState().changes.at(-1)?.kind, "add-extra");
+  });
+
+  it("preconfirmed edits and deletions apply without a dialog and are logged", async () => {
+    syncWeeks(at(SAT));
+    confirmPlan(SAT);
+    assert.equal(await updateTask("q-react-architecture", { effort: "S", effortUnits: 1 }, { preconfirmed: true }), true);
+    assert.equal(weekTarget(useQuestStore.getState().quests, SAT), 12);
+    assert.equal(await removeTask("q-english-listening", { preconfirmed: true }), true);
+    assert.equal(weekTarget(useQuestStore.getState().quests, SAT), 10);
+    assert.equal(asked.length, 0);
+    assert.deepEqual(usePlanStore.getState().changes.slice(-2).map((c) => [c.kind, c.targetBefore, c.targetAfter]), [["effort", 14, 12], ["remove", 12, 10]]);
+  });
+
+  it("checklists never change effort or the score", () => {
+    syncWeeks(at(SAT));
+    const before = computeWeekProgress(useQuestStore.getState().quests, SAT, usePlanStore.getState().plans[SAT]);
+    useQuestStore.getState().updateQuest("q-react-architecture", { subtasks: [{ id: "s1", title: "Step", done: true }] });
+    const after = computeWeekProgress(useQuestStore.getState().quests, SAT, usePlanStore.getState().plans[SAT]);
+    assert.deepEqual(after, before);
   });
 });

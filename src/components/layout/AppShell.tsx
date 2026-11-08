@@ -17,6 +17,8 @@ import { CalendarView } from "../calendar/CalendarView";
 import { TaskList } from "../planner/TaskList";
 import { WeeklyPlanner } from "../planner/WeeklyPlanner";
 import { DialogHost } from "../ui/Modal";
+import { EditorHost } from "../editors/EditorHost";
+import { QuickAddHost } from "../quickadd/QuickAddHost";
 import { CourseView } from "../views/CourseView";
 import { QuranView } from "../views/QuranView";
 import { UpcomingWidget } from "../world/UpcomingWidget";
@@ -73,6 +75,13 @@ export function AppShell() {
         else closePreview();
         return;
       }
+      // N = Quick Add (an event when looking at the calendar).
+      if (e.key === "n" || e.key === "N") {
+        e.preventDefault();
+        const s = useWorldStore.getState();
+        s.openQuickAdd(s.view === "calendar" ? "event" : "task");
+        return;
+      }
       const next = NAV_SHORTCUTS[e.key];
       if (next) goTo(next);
     };
@@ -92,6 +101,8 @@ export function AppShell() {
 
         <ReminderWatcher />
         <DialogHost />
+        <QuickAddHost />
+        <EditorHost />
         <TopHUD />
         <QuickNavigation />
         <Toast />

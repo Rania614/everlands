@@ -2,7 +2,6 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, ListChecks, Plus, ScrollText } from "lucide-react";
-import { useState } from "react";
 import { useWeek } from "@/hooks/useWeek";
 import { useWorldNavigation } from "@/hooks/useWorldNavigation";
 import { cn } from "@/lib/utils";
@@ -10,7 +9,6 @@ import { useQuestStore } from "@/stores/questStore";
 import { useWorldStore } from "@/stores/worldStore";
 import { Button } from "../ui/Button";
 import { QuestCard } from "./QuestCard";
-import { TaskFormModal } from "./TaskFormModal";
 import { WeeklySummary } from "./WeeklySummary";
 
 /**
@@ -34,7 +32,7 @@ export function QuestPanel({
   const setOpen = onOpenChange ?? setStoreOpen;
   const { goTo } = useWorldNavigation();
   const week = useWeek();
-  const [adding, setAdding] = useState(false);
+  const openQuickAdd = useWorldStore((s) => s.openQuickAdd);
 
   const today = week?.today;
   const todays = quests
@@ -93,7 +91,7 @@ export function QuestPanel({
                   </>
                 )}
                 <div className="flex gap-2">
-                  <Button variant="soft" size="sm" className="flex-1" onClick={() => setAdding(true)} disabled={!week}>
+                  <Button variant="soft" size="sm" className="flex-1" onClick={() => openQuickAdd("task", { date: week?.today })} disabled={!week}>
                     <Plus className="h-4 w-4" /> Add task
                   </Button>
                   <Button variant="ghost" size="sm" className="flex-1" onClick={() => goTo("planner")}>
@@ -105,9 +103,6 @@ export function QuestPanel({
           )}
         </AnimatePresence>
       </div>
-      {week && (
-        <TaskFormModal open={adding} onClose={() => setAdding(false)} defaults={{ weekKey: week.weekKey, date: week.today }} />
-      )}
     </aside>
   );
 }

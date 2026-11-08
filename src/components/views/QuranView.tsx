@@ -1,31 +1,22 @@
 "use client";
 
-import { BookMarked, Check, HeartHandshake, Minus, Pencil, Plus, Trash2 } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { BookMarked, Check, HeartHandshake, Minus, Pencil, Plus } from "lucide-react";
 import { useTodayKey } from "@/hooks/useWeek";
-import { diffDays, formatDay, formatTime, monthKeyOf, weekKeyOf } from "@/lib/dates";
-import { weekStartSetting } from "@/lib/lifecycle";
+import { diffDays, formatDay, formatTime, monthKeyOf } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { useQuestStore } from "@/stores/questStore";
 import { useQuranStore } from "@/stores/quranStore";
 import { useWorldStore } from "@/stores/worldStore";
-import type { QuranActivity, QuranExam, QuranResult, QuranSession } from "@/types/learning";
-import { QuestCard } from "../quests/QuestCard";
-import { TaskFormModal, type TaskDefaults } from "../quests/TaskFormModal";
+import type { QuranExam, QuranSession } from "@/types/learning";
+import { InlineTaskAdd } from "../quests/InlineTaskAdd";
+import { TaskRow } from "../quests/TaskRow";
+import { ACTIVITY_LABELS, RESULT_LABELS } from "../quickadd/QuranForms";
+import { QURAN_EXAM_PREP_TEMPLATES } from "@/lib/quickAdd";
 import { Button } from "../ui/Button";
-import { Chip, SelectInput, TextArea, TextInput } from "../ui/Field";
-import { Modal } from "../ui/Modal";
+import { Chip } from "../ui/Field";
 import { ProgressBar } from "../ui/ProgressBar";
 import { ViewFrame } from "./ViewFrame";
 
-export const ACTIVITY_LABELS: Record<QuranActivity, string> = {
-  memorization: "Memorization",
-  revision: "Revision",
-  tathbit: "Tathbit (تثبيت)",
-  "exam-prep": "Exam preparation",
-  assessment: "Assessment",
-};
-const RESULT_LABELS: Record<QuranResult, string> = { excellent: "Excellent", good: "Good", "needs-review": "Needs more review" };
 
 /** Independent Quran space: monthly plan, sessions and exam preparation. No scores or rewards. */
 export function QuranView() {
@@ -47,8 +38,8 @@ function Quran({ today }: { today: string }) {
   const sessions = useQuranStore((s) => s.sessions);
   const exams = useQuranStore((s) => s.exams);
   const focus = useWorldStore((s) => s.focus);
-  const [session, setSession] = useState<QuranSession | "new" | null>(null);
-  const [exam, setExam] = useState<QuranExam | "new" | null>(null);
+  const openQuickAdd = useWorldStore((s) => s.openQuickAdd);
+  const openEditor = useWorldStore((s) => s.openEditor);
 
   const month = monthKeyOf(today);
   const monthSessions = sessions.filter((s) => monthKeyOf(s.date) === month).sort((a, b) => a.date.localeCompare(b.date));
@@ -97,13 +88,13 @@ function Quran({ today }: { today: string }) {
         <section className="rounded-3xl bg-white/55 p-4" aria-label="Sessions">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="font-display text-lg font-semibold text-ink">Sessions this month</h3>
-            <Button size="sm" variant="primary" onClick={() => setSession("new")}>
+            <Button size="sm" variant="primary" onClick={() => openQuickAdd("quran", { lockKind: true })}>
               <Plus className="h-4 w-4" /> Session
             </Button>
           </div>
           <ul className="space-y-2">
             {monthSessions.map((s) => (
-              <SessionRow key={s.id} s={s} onEdit={() => setSession(s)} />
+              <SessionRow key={s.id} s={s} onEdit={() => openEditor("quran-session", s.id)} />
             ))}
             {monthSessions.length === 0 && <li className="rounded-2xl bg-white/60 p-4 text-center text-sm text-ink-soft">No sessions this month yet.</li>}
           </ul>
@@ -113,20 +104,18 @@ function Quran({ today }: { today: string }) {
       <section className="mt-4" aria-label="Quran exams">
         <div className="mb-2 flex items-center justify-between">
           <h3 className="font-display text-lg font-semibold text-ink">Exams</h3>
-          <Button size="sm" variant="secondary" onClick={() => setExam("new")}>
+          <Button size="sm" variant="secondary" onClick={() => openQuickAdd("quran-exam", { lockKind: true })}>
             <Plus className="h-4 w-4" /> Exam
           </Button>
         </div>
         <div className="grid gap-3 lg:grid-cols-2">
           {upcomingExams.map((x) => (
-            <ExamCard key={x.id} exam={x} today={today} highlighted={focus.quranExamId === x.id} onEdit={() => setExam(x)} />
+            <ExamCard key={x.id} exam={x} today={today} highlighted={focus.quranExamId === x.id} onEdit={() => openEditor("quran-exam", x.id)} />
           ))}
           {upcomingExams.length === 0 && <p className="rounded-2xl bg-white/60 p-4 text-sm text-ink-soft">No exams planned.</p>}
         </div>
       </section>
 
-      {session && <SessionModal session={session === "new" ? null : session} today={today} onClose={() => setSession(null)} />}
-      {exam && <ExamModal exam={exam === "new" ? null : exam} today={today} onClose={() => setExam(null)} />}
     </ViewFrame>
   );
 }
@@ -162,129 +151,10 @@ function SessionRow({ s, onEdit }: { s: QuranSession; onEdit: () => void }) {
   );
 }
 
-function num(v: string) {
-  const n = Number(v);
-  return v.trim() && Number.isFinite(n) && n > 0 ? Math.round(n) : null;
-}
-
-function SessionModal({ session, today, onClose }: { session: QuranSession | null; today: string; onClose: () => void }) {
-  const add = useQuranStore((s) => s.addSession);
-  const update = useQuranStore((s) => s.updateSession);
-  const remove = useQuranStore((s) => s.removeSession);
-  const exams = useQuranStore((s) => s.exams);
-  const [f, setF] = useState({
-    date: session?.date ?? today,
-    time: session?.time ?? "",
-    surah: session?.surah ?? "",
-    fromAyah: session?.fromAyah?.toString() ?? "",
-    toAyah: session?.toAyah?.toString() ?? "",
-    fromPage: session?.fromPage?.toString() ?? "",
-    toPage: session?.toPage?.toString() ?? "",
-    activity: session?.activity ?? ("revision" as QuranActivity),
-    status: session?.status ?? "planned",
-    notes: session?.notes ?? "",
-    result: session?.result ?? "",
-    nextRevisionDate: session?.nextRevisionDate ?? "",
-    examId: session?.examId ?? "",
-  });
-  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF((x) => ({ ...x, [k]: e.target.value }));
-
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    const data = {
-      date: f.date,
-      time: f.time || null,
-      surah: f.surah.trim(),
-      fromAyah: num(f.fromAyah),
-      toAyah: num(f.toAyah),
-      fromPage: num(f.fromPage),
-      toPage: num(f.toPage),
-      activity: f.activity,
-      status: f.status as QuranSession["status"],
-      notes: f.notes,
-      result: (f.result || null) as QuranResult | null,
-      nextRevisionDate: f.nextRevisionDate || null,
-      examId: f.examId || null,
-    };
-    if (session) update(session.id, data);
-    else add(data);
-    onClose();
-  };
-
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title={session ? "Edit session" : "New Quran session"}
-      footer={
-        <>
-          {session && (
-            <Button variant="ghost" className="mr-auto" onClick={() => { remove(session.id); onClose(); }}>
-              <Trash2 className="h-4 w-4" /> Delete
-            </Button>
-          )}
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="primary" type="submit" form="quran-session-form">
-            Save session
-          </Button>
-        </>
-      }
-    >
-      <form id="quran-session-form" onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
-        <TextInput label="Date" type="date" required value={f.date} onChange={set("date")} />
-        <TextInput label="Time" type="time" value={f.time} onChange={set("time")} hint="Optional" />
-        <TextInput label="Surah" value={f.surah} onChange={set("surah")} placeholder="e.g. Al-Mulk" className="sm:col-span-2" />
-        <div className="grid grid-cols-2 gap-2">
-          <TextInput label="From ayah" type="number" min={1} value={f.fromAyah} onChange={set("fromAyah")} />
-          <TextInput label="To ayah" type="number" min={1} value={f.toAyah} onChange={set("toAyah")} />
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <TextInput label="From page" type="number" min={1} value={f.fromPage} onChange={set("fromPage")} />
-          <TextInput label="To page" type="number" min={1} value={f.toPage} onChange={set("toPage")} />
-        </div>
-        <SelectInput label="Activity" value={f.activity} onChange={set("activity")}>
-          {Object.entries(ACTIVITY_LABELS).map(([id, label]) => (
-            <option key={id} value={id}>
-              {label}
-            </option>
-          ))}
-        </SelectInput>
-        <SelectInput label="Status" value={f.status} onChange={set("status")}>
-          <option value="planned">Planned</option>
-          <option value="completed">Completed</option>
-        </SelectInput>
-        <SelectInput label="Revision result" value={f.result} onChange={set("result")}>
-          <option value="">—</option>
-          {Object.entries(RESULT_LABELS).map(([id, label]) => (
-            <option key={id} value={id}>
-              {label}
-            </option>
-          ))}
-        </SelectInput>
-        <TextInput label="Next revision" type="date" value={f.nextRevisionDate} onChange={set("nextRevisionDate")} hint="Optional" />
-        {exams.length > 0 && (
-          <SelectInput label="For exam" value={f.examId} onChange={set("examId")} className="sm:col-span-2">
-            <option value="">None</option>
-            {exams.map((x) => (
-              <option key={x.id} value={x.id}>
-                {x.title}
-              </option>
-            ))}
-          </SelectInput>
-        )}
-        <TextArea label="Notes" value={f.notes} onChange={set("notes")} className="sm:col-span-2" rows={2} />
-      </form>
-    </Modal>
-  );
-}
-
 function ExamCard({ exam, today, highlighted, onEdit }: { exam: QuranExam; today: string; highlighted: boolean; onEdit: () => void }) {
   const update = useQuranStore((s) => s.updateExam);
   const quests = useQuestStore((s) => s.quests);
   const sessions = useQuranStore((s) => s.sessions);
-  const [adding, setAdding] = useState<TaskDefaults | null>(null);
   const prep = quests.filter((q) => q.quranExamId === exam.id);
   const prepDone = prep.filter((q) => q.status === "done").length;
   const linkedSessions = sessions.filter((s) => s.examId === exam.id && s.status === "completed").length;
@@ -326,24 +196,20 @@ function ExamCard({ exam, today, highlighted, onEdit }: { exam: QuranExam; today
       </div>
 
       <div className="mt-3">
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-sm font-bold text-ink">
-            Preparation {prep.length > 0 && <span className="font-semibold text-ink-soft">· {prepDone}/{prep.length}</span>}
-          </p>
-          <Button
-            size="sm"
-            variant="soft"
-            onClick={() => setAdding({ weekKey: weekKeyOf(today, weekStartSetting()), date: today, locationId: "gardens", quranExamId: exam.id, title: "" })}
-          >
-            <Plus className="h-4 w-4" /> Preparation task
-          </Button>
-        </div>
-        <div className="space-y-2">
+        <p className="mb-2 text-sm font-bold text-ink">
+          Preparation {prep.length > 0 && <span className="font-semibold text-ink-soft">· {prepDone}/{prep.length}</span>}
+        </p>
+        <ul className="mb-2 space-y-1.5">
           {prep.map((q) => (
-            <QuestCard key={q.id} quest={q} compact showDate showLocation={false} />
+            <TaskRow key={q.id} quest={q} />
           ))}
-          {prep.length === 0 && <p className="text-xs text-ink-soft">Preparation tasks appear in your Planner and Calendar.</p>}
-        </div>
+        </ul>
+        <InlineTaskAdd
+          context={{ today, area: "quran", date: today, quranExamId: exam.id }}
+          placeholder="Add a preparation step…"
+          templates={QURAN_EXAM_PREP_TEMPLATES}
+          existingTitles={prep.map((q) => q.title)}
+        />
       </div>
       {(exam.notes || exam.result) && (
         <p className="mt-3 text-sm text-ink-soft">
@@ -351,67 +217,7 @@ function ExamCard({ exam, today, highlighted, onEdit }: { exam: QuranExam; today
           {exam.result && <span className="block font-semibold text-ink">Result: {exam.result}</span>}
         </p>
       )}
-      {adding && <TaskFormModal open onClose={() => setAdding(null)} defaults={adding} heading="New preparation task" />}
     </article>
   );
 }
 
-function ExamModal({ exam, today, onClose }: { exam: QuranExam | null; today: string; onClose: () => void }) {
-  const add = useQuranStore((s) => s.addExam);
-  const update = useQuranStore((s) => s.updateExam);
-  const remove = useQuranStore((s) => s.removeExam);
-  const [f, setF] = useState({
-    title: exam?.title ?? "",
-    date: exam?.date ?? today,
-    time: exam?.time ?? "",
-    ranges: exam?.ranges ?? "",
-    requiredRounds: exam?.requiredRounds ?? 3,
-    notes: exam?.notes ?? "",
-    result: exam?.result ?? "",
-    status: exam?.status ?? "upcoming",
-  });
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    if (!f.title.trim()) return;
-    const data = { ...f, title: f.title.trim(), time: f.time || null, requiredRounds: Math.max(1, Number(f.requiredRounds)), status: f.status as QuranExam["status"] };
-    if (exam) update(exam.id, data);
-    else add({ ...data, roundsCompleted: 0 });
-    onClose();
-  };
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title={exam ? "Edit exam" : "New Quran exam"}
-      footer={
-        <>
-          {exam && (
-            <Button variant="ghost" className="mr-auto" onClick={() => { remove(exam.id); onClose(); }}>
-              <Trash2 className="h-4 w-4" /> Delete
-            </Button>
-          )}
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="primary" type="submit" form="quran-exam-form" disabled={!f.title.trim()}>
-            Save exam
-          </Button>
-        </>
-      }
-    >
-      <form id="quran-exam-form" onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
-        <TextInput label="Title" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} className="sm:col-span-2" placeholder="e.g. Juz 29 exam" />
-        <TextInput label="Exam date" type="date" required value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} />
-        <TextInput label="Time" type="time" value={f.time} onChange={(e) => setF({ ...f, time: e.target.value })} hint="Optional" />
-        <TextInput label="Surahs or ranges" value={f.ranges} onChange={(e) => setF({ ...f, ranges: e.target.value })} className="sm:col-span-2" placeholder="e.g. Al-Mulk to Al-Mursalat, pages 562–581" />
-        <TextInput label="Required revision rounds" type="number" min={1} max={30} value={f.requiredRounds} onChange={(e) => setF({ ...f, requiredRounds: Number(e.target.value) })} />
-        <SelectInput label="Status" value={f.status} onChange={(e) => setF({ ...f, status: e.target.value as QuranExam["status"] })}>
-          <option value="upcoming">Upcoming</option>
-          <option value="done">Taken</option>
-        </SelectInput>
-        <TextArea label="Notes" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} className="sm:col-span-2" rows={2} />
-        <TextInput label="Result" value={f.result} onChange={(e) => setF({ ...f, result: e.target.value })} className="sm:col-span-2" placeholder="Optional" />
-      </form>
-    </Modal>
-  );
-}

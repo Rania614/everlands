@@ -16,13 +16,19 @@ interface ModalProps {
   children: ReactNode;
   footer?: ReactNode;
   size?: "sm" | "md" | "lg";
+  /**
+   * dialog: centred (confirmations).
+   * sheet:  compact card anchored low on desktop, bottom sheet on phones (Quick Add).
+   * drawer: side panel on desktop, bottom sheet on phones (editing). The page stays visible.
+   */
+  variant?: "dialog" | "sheet" | "drawer";
 }
 
 /** Open modals, innermost last: Escape only closes the top one. */
 const modalStack: symbol[] = [];
 
 /** Accessible dialog: focus moves in, Escape closes, focus returns on close. */
-export function Modal({ open, onClose, title, description, children, footer, size = "md" }: ModalProps) {
+export function Modal({ open, onClose, title, description, children, footer, size = "md", variant = "dialog" }: ModalProps) {
   const titleId = useId();
   const panel = useRef<HTMLDivElement>(null);
 
@@ -32,7 +38,9 @@ export function Modal({ open, onClose, title, description, children, footer, siz
     const me = Symbol("modal");
     modalStack.push(me);
     const t = setTimeout(() => {
-      const first = panel.current?.querySelector<HTMLElement>("input, select, textarea, button:not([data-close])");
+      const first =
+        panel.current?.querySelector<HTMLElement>("[data-autofocus]") ??
+        panel.current?.querySelector<HTMLElement>("input, select, textarea, button:not([data-close])");
       (first ?? panel.current)?.focus();
     }, 30);
     const onKey = (e: KeyboardEvent) => {
@@ -55,7 +63,12 @@ export function Modal({ open, onClose, title, description, children, footer, siz
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-[60] flex items-end justify-center bg-ink/25 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
+          className={cn(
+            "fixed inset-0 z-[60] flex items-end p-0",
+            variant === "dialog" && "justify-center bg-ink/25 backdrop-blur-[2px] sm:items-center sm:p-4",
+            variant === "sheet" && "justify-center bg-ink/15 sm:items-end sm:pb-24",
+            variant === "drawer" && "justify-center bg-ink/10 sm:items-stretch sm:justify-end sm:p-3",
+          )}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -68,13 +81,19 @@ export function Modal({ open, onClose, title, description, children, footer, siz
             aria-modal="true"
             aria-labelledby={titleId}
             tabIndex={-1}
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 12, opacity: 0 }}
+            initial={variant === "drawer" ? { x: 24, opacity: 0 } : { y: 20, opacity: 0 }}
+            animate={{ x: 0, y: 0, opacity: 1 }}
+            exit={variant === "drawer" ? { x: 16, opacity: 0 } : { y: 12, opacity: 0 }}
             transition={{ duration: 0.18 }}
             className={cn(
               "flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-[28px] bg-paper shadow-lift outline-none sm:rounded-[28px]",
-              size === "sm" ? "sm:max-w-md" : size === "md" ? "sm:max-w-xl" : "sm:max-w-3xl",
+              variant === "drawer"
+                ? "sm:max-h-none sm:max-w-[440px]"
+                : size === "sm"
+                  ? "sm:max-w-md"
+                  : size === "md"
+                    ? "sm:max-w-xl"
+                    : "sm:max-w-3xl",
             )}
           >
             <header className="flex items-start gap-3 border-b border-ink/5 px-5 py-4">

@@ -17,7 +17,7 @@ Checks:
 npm run typecheck    # tsc --noEmit
 npm run lint         # eslint
 npm run build        # production build
-npm test             # progression, course, Quran and calendar tests (node:test via tsx)
+npm test             # progression, course, Quran, calendar and Quick Add tests (node:test via tsx)
 npm run check        # all four
 ```
 
@@ -26,6 +26,7 @@ npm run check        # all four
 - **Drag**: pan. **Scroll or pinch**: zoom. Rotation is locked so the isometric view stays put.
 - **Click a building, its marker or its name tag** to select it. The camera moves in, a preview opens and the dragon heads there.
 - **Enter Location** opens that location's productivity view. **Esc** or **World** brings you back.
+- **N** (or the **+ Add** button) opens Quick Add: a task, an event, an exam or a Quran session.
 - **1–6** switch views (World, Planner, Calendar, Tasks, Progress, Settings).
 - **Click the dragon** to make it hop, or to wake it after it falls asleep.
 
@@ -169,7 +170,7 @@ Weekly Score   = (Planned Done + Extra Counted) / Weekly Target × 100
 - **Dates:** stored as local day keys (`YYYY-MM-DD`) with optional `HH:mm` times. Day maths uses calendar days, so it is DST-safe, and week boundaries follow the configured first day of the week.
 - **Changing the first day of the week:** open weeks are regrouped and closed weeks are untouched.
 
-### 8. Tests (`npm test`, 24 passing)
+### 8. Tests (`npm test`)
 
 `tests/progression.test.ts` and `tests/stores.test.ts` cover the acceptance scenarios:
 
@@ -202,6 +203,19 @@ Scenarios 31–32 (persistence after refresh; desktop and mobile layouts) were c
 - **World milestones** are recorded but not yet shown as 3D changes. That's the next milestone.
 - **Storage:** all data is stored in the browser's `localStorage`, so clearing site data or switching browsers loses it until Supabase is added.
 
+## UX simplification milestone
+
+See `docs/ux-audit.md` for the audit, the measured before/after numbers and screenshots in `docs/screenshots/`.
+
+- **Quick Add** (`components/quickadd/`): one sheet for Task · Event · Exam · Quran, opened from **+ Add**, the **N** key, or in context (calendar day, planner day, lesson, exam, location). Known context is applied and never asked again. Drafts survive an accidental close.
+- **Progressive disclosure**: Level 1 essentials, Level 2 under **More details**, Level 3 in Settings.
+- **Editing in a drawer** (`components/editors/EditorHost.tsx`): side panel on desktop, bottom sheet on phones. One sheet at a time; related tasks are added inline; confirmations are inline (e.g. "Save · target 14 → 16"), so dialogs never stack.
+- **Inline editing**: task status, day and effort chips; checklist (subtasks) on any task; planner drag & drop.
+- **Exams**: save with title, subject and date, then add preparation tasks with one tap.
+- **Lessons**: accordion with schedule, attendance and homework quick actions; notes and resources in a second tab.
+- **Quran**: one "Surah or range" field (`Al-Mulk 1-15`, `p562-564`), "Done" by default for today.
+- **Core Goals**: compact rows with presets; requirements folded.
+
 ## Project structure
 
 ```
@@ -215,17 +229,19 @@ src/
     dragon/       DragonCompanion (R3F glue), DragonModel (rig), DragonAnimations (poses),
                   DragonController (state machine + navigation, plain TS)
     locations/    CentralHaven, KnowledgeCastle, SacredGardens, InventorWorkshop
-    quests/       QuestPanel, QuestCard, TaskFormModal, WeeklySummary, FocusTimer
+    quickadd/     QuickAddHost, QuickTaskForm, QuickEventForm, QuickExamForm, QuranForms, fields
+    editors/      EditorHost (task, event/exam, Quran session, Quran exam drawers)
+    quests/       QuestPanel, QuestCard, TaskRow (inline meta), InlineTaskAdd, WeeklySummary, FocusTimer
     planner/      WeeklyPlanner, TaskList
-    calendar/     CalendarView, EventEditor (incl. exam preparation)
+    calendar/     CalendarView, ExamPrep
     views/        ViewFrame, LocationView, ProgressView, SettingsView, CoreGoalsEditor, CourseView, QuranView
-    ui/           Button, Panel, ProgressBar(+Ring), Modal(+DialogHost), Field, LocationThumbnail, icons
+    ui/           Button, Panel, ProgressBar(+Ring), Modal (dialog/sheet/drawer + DialogHost), ChipGroup, Disclosure, Field, LocationThumbnail, icons
   data/           locations.ts, quests.ts, growthAreas.ts (areas + default Core Goals)
   stores/         worldStore, questStore, planStore, courseStore, quranStore, calendarStore
   hooks/          useWorldNavigation, useEnvironment, useWeek, useCalendarFeed
   types/          world.ts, quest.ts, plan.ts, learning.ts, calendar.ts
-  lib/            constants, utils, dates, progression, lifecycle, taskActions, calendarFeed, recurrence
-tests/            progression.test.ts, stores.test.ts
+  lib/            constants, utils, dates, progression, lifecycle, taskActions, calendarFeed, recurrence, quickAdd
+tests/            progression.test.ts, stores.test.ts, quickAdd.test.ts
 ```
 
 **Replacing the dragon with a GLB model.** `DragonAnimations` and `DragonController` only talk to the `DragonRig` interface (bob, body, head, eyes, wings, tail, legs). To use a professionally modelled GLB, load it in a new model component and map its bones to that interface. The behaviour code stays as it is.

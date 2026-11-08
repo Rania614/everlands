@@ -13,6 +13,7 @@ export function UpcomingWidget({ className, defaultOpen = true }: { className?: 
   const today = useTodayKey();
   const items = useUpcoming(today);
   const openView = useWorldStore((s) => s.openView);
+  const openEditor = useWorldStore((s) => s.openEditor);
   const [open, setOpen] = useState(defaultOpen);
 
   return (
@@ -36,7 +37,10 @@ export function UpcomingWidget({ className, defaultOpen = true }: { className?: 
               <li key={it.label}>
                 <button
                   type="button"
-                  onClick={() => openView(it.view, it.focus)}
+                  onClick={() =>
+                    // Events and exams open in a drawer right here; lessons and Quran open their space.
+                    it.focus.eventId ? openEditor("event", it.focus.eventId) : it.focus.quranExamId ? openEditor("quran-exam", it.focus.quranExamId) : openView(it.view, it.focus)
+                  }
                   className="flex w-full items-center gap-2.5 rounded-2xl bg-white/70 px-2.5 py-2 text-left hover:bg-white"
                 >
                   <span className="h-8 w-1 shrink-0 rounded-full" style={{ background: it.color }} aria-hidden="true" />

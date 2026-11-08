@@ -12,7 +12,6 @@ import { useQuestStore } from "@/stores/questStore";
 import { useWorldStore } from "@/stores/worldStore";
 import type { LocationId } from "@/types/world";
 import { Plus } from "lucide-react";
-import { TaskFormModal } from "../quests/TaskFormModal";
 import { WeeklySummary } from "../quests/WeeklySummary";
 import { CourseSummary, QuranSummary } from "./ProgressView";
 import { FocusTimer } from "../quests/FocusTimer";
@@ -33,7 +32,7 @@ export function LocationView({ id }: { id: LocationId }) {
   const { backToWorld } = useWorldNavigation();
   const openView = useWorldStore((s) => s.openView);
   const week = useWeek();
-  const [adding, setAdding] = useState(false);
+  const openQuickAdd = useWorldStore((s) => s.openQuickAdd);
   // This week's tasks for this place (the Central Haven shows the whole week).
   const local = questsForLocation(
     quests.filter((q) => q.weekKey === week?.weekKey),
@@ -135,7 +134,7 @@ export function LocationView({ id }: { id: LocationId }) {
             title={id === "haven" ? "All of this week's quests" : "This week's quests here"}
             className="bg-white/50 shadow-none"
             actions={
-              <Button size="sm" variant="soft" onClick={() => setAdding(true)} disabled={!week}>
+              <Button size="sm" variant="soft" onClick={() => openQuickAdd("task", { date: week?.today, locationId: id })} disabled={!week}>
                 <Plus className="h-4 w-4" /> Add
               </Button>
             }
@@ -151,9 +150,6 @@ export function LocationView({ id }: { id: LocationId }) {
           </Panel>
         </div>
       </div>
-      {week && (
-        <TaskFormModal open={adding} onClose={() => setAdding(false)} defaults={{ weekKey: week.weekKey, date: week.today, locationId: id }} />
-      )}
     </ViewFrame>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Layers, X } from "lucide-react";
+import { ArrowRight, BookOpen, HeartHandshake, Layers, X } from "lucide-react";
+import { useWorldStore } from "@/stores/worldStore";
 import { LOCATIONS } from "@/data/locations";
 import { useWorldNavigation } from "@/hooks/useWorldNavigation";
 import { progressOf, questsForLocation } from "@/lib/utils";
@@ -14,6 +15,7 @@ import { ProgressBar } from "../ui/ProgressBar";
 
 export function LocationPreview() {
   const { selectedLocationId, enterLocation, closePreview } = useWorldNavigation();
+  const openView = useWorldStore((s) => s.openView);
   const allQuests = useQuestStore((s) => s.quests);
   const week = useWeek();
   const quests = allQuests.filter((q) => q.weekKey === week?.weekKey);
@@ -61,7 +63,13 @@ export function LocationPreview() {
                 );
               })}
             </ul>
-            <Button variant="primary" size="lg" className="mt-4 w-full" onClick={() => enterLocation(loc.id)}>
+            {(loc.id === "castle" || loc.id === "gardens") && (
+              <Button variant="secondary" className="mt-4 w-full" onClick={() => openView(loc.id === "castle" ? "course" : "quran")}>
+                {loc.id === "castle" ? <BookOpen className="h-4 w-4" /> : <HeartHandshake className="h-4 w-4" />}
+                {loc.id === "castle" ? "Open English course" : "Open Quran journey"}
+              </Button>
+            )}
+            <Button variant="primary" size="lg" className={loc.id === "castle" || loc.id === "gardens" ? "mt-2 w-full" : "mt-4 w-full"} onClick={() => enterLocation(loc.id)}>
               Enter {loc.name} <ArrowRight className="h-4 w-4" />
             </Button>
           </div>

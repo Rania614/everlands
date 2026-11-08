@@ -8,9 +8,9 @@ import { useWeek } from "@/hooks/useWeek";
 import { addDays } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { useQuestStore } from "@/stores/questStore";
+import { useWorldStore } from "@/stores/worldStore";
 import type { LocationId } from "@/types/world";
 import { QuestCard } from "../quests/QuestCard";
-import { TaskFormModal } from "../quests/TaskFormModal";
 import { WeeklySummary } from "../quests/WeeklySummary";
 import { Button } from "../ui/Button";
 import { ViewFrame } from "../views/ViewFrame";
@@ -30,7 +30,7 @@ export function TaskList() {
   const [filter, setFilter] = useState<Filter>("all");
   const [scope, setScope] = useState<Scope>("this");
   const [place, setPlace] = useState<LocationId | "any">("any");
-  const [adding, setAdding] = useState(false);
+  const openQuickAdd = useWorldStore((s) => s.openQuickAdd);
 
   const visible = quests
     .filter((q) => {
@@ -49,7 +49,7 @@ export function TaskList() {
       title="Tasks"
       icon={<ListChecks className="h-5 w-5" />}
       actions={
-        <Button variant="primary" size="sm" onClick={() => setAdding(true)} disabled={!week}>
+        <Button variant="primary" size="sm" onClick={() => openQuickAdd("task", { date: week?.today })} disabled={!week}>
           <Plus className="h-4 w-4" /> New task
         </Button>
       }
@@ -110,7 +110,6 @@ export function TaskList() {
         </div>
         <div className="space-y-3">{week && <WeeklySummary week={week} />}</div>
       </div>
-      {week && <TaskFormModal open={adding} onClose={() => setAdding(false)} defaults={{ weekKey: week.weekKey, date: week.today }} />}
     </ViewFrame>
   );
 }

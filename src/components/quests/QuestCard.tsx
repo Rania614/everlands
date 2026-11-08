@@ -1,20 +1,18 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { CalendarDays, Check, Clock, MapPin, Pencil, Play, RotateCcw, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Check, ListChecks, MapPin } from "lucide-react";
 import { GROWTH_AREAS } from "@/data/growthAreas";
 import { LOCATIONS } from "@/data/locations";
 import { useWorldNavigation } from "@/hooks/useWorldNavigation";
-import { formatDay } from "@/lib/dates";
 import { KIND_LABELS } from "@/lib/progression";
-import { completeTask, removeTask, reopenTask, startTask, toggleTask } from "@/lib/taskActions";
-import { cn, formatMinutes } from "@/lib/utils";
+import { cycleStatus, toggleTask } from "@/lib/taskActions";
+import { cn } from "@/lib/utils";
 import { usePlanStore } from "@/stores/planStore";
+import { useWorldStore } from "@/stores/worldStore";
 import type { Quest, QuestStatus } from "@/types/quest";
-import { Button } from "../ui/Button";
 import { Chip } from "../ui/Field";
-import { TaskFormModal } from "./TaskFormModal";
+import { TaskInlineMeta } from "./TaskRow";
 
 const STATUS: Record<QuestStatus, { label: string; className: string }> = {
   todo: { label: "Ready", className: "bg-sky/30 text-ink" },
@@ -29,14 +27,19 @@ interface QuestCardProps {
   showDate?: boolean;
 }
 
+/**
+ * One checkbox to complete, a title that opens the details drawer, and inline
+ * chips for status, day and effort. No row of competing buttons.
+ */
 export function QuestCard({ quest, compact = false, showLocation = true, showDate = false }: QuestCardProps) {
   const { selectLocation } = useWorldNavigation();
+  const openEditor = useWorldStore((s) => s.openEditor);
   const goalTitle = usePlanStore((s) => s.coreGoals.find((g) => g.id === quest.coreGoalId)?.title);
-  const [editing, setEditing] = useState(false);
   const loc = LOCATIONS[quest.locationId];
   const done = quest.status === "done";
   const status = STATUS[quest.status];
   const isQuran = quest.category === "quran";
+  const subtasks = quest.subtasks ?? [];
 
   return (
     <motion.article
@@ -66,80 +69,50 @@ export function QuestCard({ quest, compact = false, showLocation = true, showDat
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <h3 className={cn("font-display text-[15px] font-semibold leading-snug text-ink", done && "text-ink-soft line-through decoration-forest/60")}>
+            <button
+              type="button"
+              onClick={() => openEditor("task", quest.id)}
+              title="Open details"
+              className={cn("text-left font-display text-[15px] font-semibold leading-snug text-ink hover:underline", done && "text-ink-soft line-through decoration-forest/60")}
+            >
               {quest.title}
-            </h3>
-            <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-bold", status.className)}>{status.label}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => cycleStatus(quest.id)}
+              disabled={done}
+              title={done ? undefined : "Switch between Ready and In progress"}
+              aria-label={`Status: ${status.label}${done ? "" : ". Change status"}`}
+              className={cn("rounded-full px-2 py-0.5 text-[11px] font-bold", status.className, !done && "hover:ring-2 hover:ring-twilight/30")}
+            >
+              {status.label}
+            </button>
           </div>
-          {!compact && quest.description && <p className="mt-0.5 text-sm text-ink-soft">{quest.description}</p>}
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-semibold text-ink-soft">
+          {!compact && quest.description && <p className="mt-0.5 line-clamp-2 text-sm text-ink-soft">{quest.description}</p>}
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-ink-soft">
             {showLocation && (
-              <button
-                type="button"
-                onClick={() => selectLocation(quest.locationId)}
-                className="inline-flex items-center gap-1 rounded-md hover:text-ink"
-                title={`Show ${loc.name} on the map`}
-              >
+              <button type="button" onClick={() => selectLocation(quest.locationId)} className="inline-flex items-center gap-1 rounded-md hover:text-ink" title={`Show ${loc.name} on the map`}>
                 <MapPin className="h-3.5 w-3.5" style={{ color: loc.accent }} />
                 {loc.name}
               </button>
             )}
-            {showDate && (
-              <span className="inline-flex items-center gap-1">
-                <CalendarDays className="h-3.5 w-3.5" />
-                {quest.date ? formatDay(quest.date) : "Any day this week"}
-              </span>
+            <TaskInlineMeta quest={quest} showDate={showDate} />
+            {isQuran && <Chip color={GROWTH_AREAS.quran.color}>Tracked separately</Chip>}
+            {!isQuran && quest.kind === "core" && <Chip color="#E5C58F">Core · {goalTitle ?? "goal"}</Chip>}
+            {!isQuran && quest.kind !== "core" && quest.planStatus === "extra" && (
+              <Chip color="#A7C8A5">{quest.kind === "supporting" ? "Additional" : KIND_LABELS[quest.kind]}</Chip>
             )}
-            <span className="inline-flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5" />
-              {formatMinutes(quest.durationMin)}
-            </span>
-            {isQuran ? (
-              <Chip color={GROWTH_AREAS.quran.color}>Tracked separately</Chip>
-            ) : (
-              <>
-                <Chip color="#B9A1D3" className="tabular-nums">
-                  {quest.effortUnits} unit{quest.effortUnits === 1 ? "" : "s"}
-                </Chip>
-                {quest.kind === "core" ? (
-                  <Chip color="#E5C58F">Core · {goalTitle ?? "goal"}</Chip>
-                ) : quest.planStatus === "extra" ? (
-                  <Chip color="#A7C8A5">{quest.kind === "supporting" ? "Additional" : KIND_LABELS[quest.kind]}</Chip>
-                ) : null}
-              </>
+            {subtasks.length > 0 && (
+              <Chip>
+                <ListChecks className="h-3 w-3" />
+                {subtasks.filter((s) => s.done).length}/{subtasks.length}
+              </Chip>
             )}
             {(quest.eventId || quest.quranExamId) && <Chip color="#E7A99C">Exam prep</Chip>}
             {quest.lessonId && <Chip color="#8EB8D2">Lesson</Chip>}
           </div>
         </div>
       </div>
-      {!compact && (
-        <div className="mt-2.5 flex flex-wrap items-center justify-end gap-1.5">
-          <Button size="sm" variant="ghost" onClick={() => setEditing(true)} aria-label={`Edit ${quest.title}`}>
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-          {quest.custom && (
-            <Button size="sm" variant="ghost" onClick={() => removeTask(quest.id)} aria-label={`Delete ${quest.title}`}>
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          )}
-          {quest.status === "todo" && (
-            <Button size="sm" variant="secondary" onClick={() => startTask(quest.id)}>
-              <Play className="h-3.5 w-3.5" /> Start
-            </Button>
-          )}
-          {done ? (
-            <Button size="sm" variant="ghost" onClick={() => reopenTask(quest.id)}>
-              <RotateCcw className="h-3.5 w-3.5" /> Undo
-            </Button>
-          ) : (
-            <Button size="sm" variant="primary" onClick={() => completeTask(quest.id)}>
-              <Check className="h-3.5 w-3.5" /> Complete
-            </Button>
-          )}
-        </div>
-      )}
-      <TaskFormModal open={editing} onClose={() => setEditing(false)} task={quest} />
     </motion.article>
   );
 }

@@ -26,6 +26,13 @@ export type TaskKind = "core" | "supporting" | "optional" | "stretch";
  */
 export type PlanStatus = "planned" | "extra";
 
+/** Optional checklist item inside a task. */
+export interface Subtask {
+  id: string;
+  title: string;
+  done: boolean;
+}
+
 /**
  * A task ("quest" in the UI). Flat and serialisable so it maps 1:1 to a future
  * `tasks` table. A task belongs to exactly one week (`weekKey`); `date` is the
@@ -55,6 +62,9 @@ export interface Quest {
   lessonId?: string | null;
   eventId?: string | null;
   quranExamId?: string | null;
+
+  /** Optional checklist; never affects effort units or the score. */
+  subtasks?: Subtask[];
 
   /** True for user-created tasks (sample quests cannot be deleted). */
   custom: boolean;

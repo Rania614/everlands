@@ -6,15 +6,10 @@ import { useCalendarFeed } from "@/hooks/useCalendarFeed";
 import { useTodayKey } from "@/hooks/useWeek";
 import { addDays, addMonths, formatDay, formatTime, relativeDays, weekDays, weekKeyOf } from "@/lib/dates";
 import { cn } from "@/lib/utils";
-import { useCalendarStore } from "@/stores/calendarStore";
-import { useQuestStore } from "@/stores/questStore";
 import { useWorldStore } from "@/stores/worldStore";
 import type { CalendarEntry } from "@/types/calendar";
-import type { Quest } from "@/types/quest";
-import { TaskFormModal, type TaskDefaults } from "../quests/TaskFormModal";
 import { Button } from "../ui/Button";
 import { ViewFrame } from "../views/ViewFrame";
-import { EventEditor } from "./EventEditor";
 
 type Mode = "month" | "week" | "day" | "agenda";
 const MODES: { id: Mode; label: string }[] = [
@@ -33,15 +28,12 @@ export function CalendarView() {
 function Calendar({ today }: { today: string }) {
   const focus = useWorldStore((s) => s.focus);
   const weekStart = useWorldStore((s) => s.settings.weekStartsOn);
-  const events = useCalendarStore((s) => s.events);
-  const quests = useQuestStore((s) => s.quests);
   const openView = useWorldStore((s) => s.openView);
+  const openEditor = useWorldStore((s) => s.openEditor);
+  const openQuickAdd = useWorldStore((s) => s.openQuickAdd);
   const [mode, setMode] = useState<Mode>(focus.date ? "day" : "month");
   const [cursor, setCursor] = useState(focus.date ?? today);
-  const [editingEvent, setEditingEvent] = useState<string | null>(focus.eventId ?? null);
-  const [creating, setCreating] = useState<string | null>(null);
-  const [task, setTask] = useState<Quest | null>(null);
-  const [newTask, setNewTask] = useState<TaskDefaults | null>(null);
+  const newEvent = (date: string) => openQuickAdd("event", { date });
 
   // Visible range per mode
   const monthStart = `${cursor.slice(0, 7)}-01`;
@@ -60,10 +52,12 @@ function Calendar({ today }: { today: string }) {
     setCursor((c) => (mode === "month" ? addMonths(c, dir) : mode === "week" ? addDays(c, 7 * dir) : addDays(c, dir)));
 
   const openEntry = (e: CalendarEntry) => {
-    if (e.kind === "event") setEditingEvent(e.refId);
-    else if (e.kind === "task") setTask(quests.find((q) => q.id === e.refId) ?? null);
-    else if (e.kind === "lesson") openView("course", { lessonId: e.refId });
-    else openView("quran", e.kind === "quran-exam" ? { quranExamId: e.refId } : {});
+    // Edit in a side drawer: the calendar stays visible and in place.
+    if (e.kind === "event") openEditor("event", e.refId);
+    else if (e.kind === "task") openEditor("task", e.refId);
+    else if (e.kind === "quran-session") openEditor("quran-session", e.refId);
+    else if (e.kind === "quran-exam") openEditor("quran-exam", e.refId);
+    else openView("course", { lessonId: e.refId });
   };
 
   const title =
@@ -81,7 +75,7 @@ function Calendar({ today }: { today: string }) {
       title="Calendar"
       icon={<CalendarDays className="h-5 w-5" />}
       actions={
-        <Button variant="primary" size="sm" onClick={() => setCreating(mode === "agenda" ? today : cursor)}>
+        <Button variant="primary" size="sm" onClick={() => newEvent(mode === "agenda" ? today : cursor)}>
           <Plus className="h-4 w-4" /> New event
         </Button>
       }
@@ -139,16 +133,12 @@ function Calendar({ today }: { today: string }) {
           today={today}
           entries={feed}
           onEntry={openEntry}
-          onAddEvent={() => setCreating(cursor)}
-          onAddTask={() => setNewTask({ weekKey: weekKeyOf(cursor, weekStart), date: cursor })}
+          onAddEvent={() => newEvent(cursor)}
+          onAddTask={() => openQuickAdd("task", { date: cursor, weekKey: weekKeyOf(cursor, weekStart) })}
         />
       )}
       {mode === "agenda" && <Agenda today={today} entries={feed} onEntry={openEntry} />}
 
-      <EventEditor open={!!editingEvent} onClose={() => setEditingEvent(null)} event={events.find((e) => e.id === editingEvent) ?? null} />
-      <EventEditor open={!!creating} onClose={() => setCreating(null)} defaultDate={creating ?? undefined} />
-      <TaskFormModal open={!!task} onClose={() => setTask(null)} task={task} />
-      <TaskFormModal open={!!newTask} onClose={() => setNewTask(null)} defaults={newTask ?? undefined} />
     </ViewFrame>
   );
 }

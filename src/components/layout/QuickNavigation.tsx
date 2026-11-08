@@ -1,6 +1,7 @@
 "use client";
 
-import { BarChart3, CalendarDays, CalendarRange, Globe2, ListChecks, Settings, type LucideIcon } from "lucide-react";
+import { BarChart3, CalendarDays, CalendarRange, Globe2, ListChecks, Plus, Settings, type LucideIcon } from "lucide-react";
+import { useWorldStore } from "@/stores/worldStore";
 import { useWorldNavigation } from "@/hooks/useWorldNavigation";
 import { cn } from "@/lib/utils";
 import type { AppView } from "@/types/world";
@@ -19,6 +20,8 @@ export const NAV_SHORTCUTS = Object.fromEntries(ITEMS.map((i) => [i.key, i.view]
 /** Left rail on desktop, bottom bar on mobile. Every item changes the view. */
 export function QuickNavigation() {
   const { view, goTo } = useWorldNavigation();
+  const openQuickAdd = useWorldStore((s) => s.openQuickAdd);
+  const quickAdd = () => openQuickAdd(view === "calendar" ? "event" : "task");
   const current = view === "location" || view === "course" || view === "quran" ? "world" : view;
 
   return (
@@ -29,7 +32,28 @@ export function QuickNavigation() {
         "fixed inset-x-0 bottom-0 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:absolute md:inset-x-auto md:bottom-auto md:left-4 md:top-1/2 md:-translate-y-1/2 md:p-0",
       )}
     >
+      {/* Quick Add: floating on phones, first item of the rail on desktop */}
+      <button
+        type="button"
+        onClick={quickAdd}
+        title="Quick add (N)"
+        aria-label="Quick add"
+        className="absolute -top-16 right-4 grid h-14 w-14 place-items-center rounded-full bg-ink text-cream shadow-lift hover:bg-[#3a4768] md:hidden"
+      >
+        <Plus className="h-6 w-6" />
+      </button>
       <ul className="glass mx-auto flex max-w-md justify-between rounded-3xl p-1.5 shadow-soft md:flex-col md:gap-1">
+        <li className="hidden md:block">
+          <button
+            type="button"
+            onClick={quickAdd}
+            title="Quick add (N)"
+            className="flex h-14 w-16 flex-col items-center justify-center gap-0.5 rounded-2xl bg-gold/60 text-[11px] font-bold text-ink hover:bg-gold"
+          >
+            <Plus className="h-5 w-5" />
+            <span>Add</span>
+          </button>
+        </li>
         {ITEMS.map(({ view: v, label, icon: Icon, key }) => {
           const active = current === v;
           return (

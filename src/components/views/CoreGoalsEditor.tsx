@@ -1,115 +1,131 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
-import { GROWTH_AREAS, SCORED_AREAS } from "@/data/growthAreas";
+import { Minus, Plus, Trash2 } from "lucide-react";
+import { DEFAULT_CORE_GOALS, GROWTH_AREAS, SCORED_AREAS } from "@/data/growthAreas";
 import { uid } from "@/lib/utils";
 import { usePlanStore } from "@/stores/planStore";
 import type { CoreGoal } from "@/types/plan";
-import type { QuestCategory } from "@/types/quest";
-import { Button } from "../ui/Button";
+import { Disclosure } from "../ui/Disclosure";
 import { Toggle, inputClass } from "../ui/Field";
 
 /**
- * Core Goals are user data, not hardcoded categories. Edits apply to weeks
- * whose plan hasn't been created yet; active weeks keep their snapshot.
+ * Compact Core Goals: one row per goal with an on/off switch and the minimum
+ * to complete. Requirements and workload stay folded until asked for.
+ * Changes apply from the next planned week; the current week keeps its snapshot.
  */
 export function CoreGoalsEditor() {
   const goals = usePlanStore((s) => s.coreGoals);
   const update = usePlanStore((s) => s.updateCoreGoal);
   const remove = usePlanStore((s) => s.removeCoreGoal);
-  const add = usePlanStore((s) => s.addCoreGoal);
-  const [newArea, setNewArea] = useState<QuestCategory>("personal");
+  const presets = DEFAULT_CORE_GOALS.filter((p) => !goals.some((g) => g.id === p.id));
+
+  const addPreset = (p: CoreGoal) => usePlanStore.setState((s) => ({ coreGoals: [...s.coreGoals, { ...p, active: true }] }));
+  const addCustom = () =>
+    usePlanStore.getState().addCoreGoal({
+      areaId: "personal",
+      title: "New goal",
+      condition: "",
+      requirements: [{ id: uid("req"), title: "First step", effort: "M" }],
+      minCompleted: 1,
+      active: true,
+    });
 
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-ink-soft">
-        Changes apply from the next week you plan. This week keeps the requirements it started with, so nothing changes silently.
-      </p>
-      {goals.map((g) => (
-        <GoalCard key={g.id} goal={g} onChange={(patch) => update(g.id, patch)} onRemove={() => remove(g.id)} />
-      ))}
-      <div className="flex flex-wrap items-center gap-2">
-        <select aria-label="Growth area for new Core Goal" value={newArea} onChange={(e) => setNewArea(e.target.value as QuestCategory)} className={`${inputClass} w-auto`}>
-          {SCORED_AREAS.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
-        <Button
-          onClick={() =>
-            add({
-              areaId: newArea,
-              title: GROWTH_AREAS[newArea].name,
-              condition: "Describe what counts as done.",
-              requirements: [{ id: uid("req"), title: "First requirement", effort: "M" }],
-              minCompleted: 1,
-              active: true,
-            })
-          }
-        >
-          <Plus className="h-4 w-4" /> Add Core Goal
-        </Button>
+    <div className="space-y-2">
+      <ul className="space-y-2">
+        {goals.map((g) => (
+          <GoalRow key={g.id} goal={g} onChange={(patch) => update(g.id, patch)} onRemove={() => remove(g.id)} />
+        ))}
+      </ul>
+      <div className="flex flex-wrap items-center gap-1.5 pt-1">
+        {presets.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => addPreset(p)}
+            className="inline-flex items-center gap-1 rounded-full border border-dashed border-twilight/40 bg-white/60 px-3 py-1 text-xs font-bold text-ink-soft hover:border-twilight hover:text-ink"
+          >
+            <Plus className="h-3 w-3" /> {p.title} preset
+          </button>
+        ))}
+        <button type="button" onClick={addCustom} className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold text-ink-soft hover:bg-white hover:text-ink">
+          <Plus className="h-3 w-3" /> Custom goal
+        </button>
       </div>
-      <p className="text-xs text-ink-soft">Quran is never a Core Goal: it is tracked in its own space and never affects levels.</p>
+      <p className="text-xs text-ink-soft">Applies from the next week you plan. Quran is never a Core Goal.</p>
     </div>
   );
 }
 
-function GoalCard({ goal, onChange, onRemove }: { goal: CoreGoal; onChange: (p: Partial<CoreGoal>) => void; onRemove: () => void }) {
-  const setReq = (id: string, patch: Partial<CoreGoal["requirements"][number]>) =>
-    onChange({ requirements: goal.requirements.map((r) => (r.id === id ? { ...r, ...patch } : r)) });
+function GoalRow({ goal, onChange, onRemove }: { goal: CoreGoal; onChange: (p: Partial<CoreGoal>) => void; onRemove: () => void }) {
+  const max = goal.requirements.length;
+  const setReq = (id: string, patch: Partial<CoreGoal["requirements"][number]>) => onChange({ requirements: goal.requirements.map((r) => (r.id === id ? { ...r, ...patch } : r)) });
   return (
-    <div className="rounded-2xl bg-white/70 p-3">
+    <li className="rounded-2xl bg-white/70 px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="h-3 w-3 rounded-full" style={{ background: GROWTH_AREAS[goal.areaId].color }} aria-hidden="true" />
-        <input aria-label="Core Goal name" value={goal.title} onChange={(e) => onChange({ title: e.target.value })} className={`${inputClass} w-40`} />
-        <span className="text-xs font-bold text-ink-soft">{GROWTH_AREAS[goal.areaId].name}</span>
-        <Toggle checked={goal.active} onChange={(active) => onChange({ active })} label={goal.active ? "Active" : "Off"} />
-        <Button size="sm" variant="ghost" className="ml-auto" onClick={onRemove} aria-label={`Delete ${goal.title}`}>
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: GROWTH_AREAS[goal.areaId].color }} aria-hidden="true" />
+        <input
+          aria-label="Core Goal name"
+          value={goal.title}
+          onChange={(e) => onChange({ title: e.target.value })}
+          className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-1 py-0.5 font-display text-base font-semibold text-ink hover:border-twilight/30 focus:border-twilight focus:bg-white"
+        />
+        <div className="flex items-center gap-1 text-xs font-bold text-ink-soft" aria-label="Minimum to complete">
+          Complete
+          <button type="button" aria-label="Fewer required" disabled={goal.minCompleted <= 1} onClick={() => onChange({ minCompleted: goal.minCompleted - 1 })} className="grid h-6 w-6 place-items-center rounded-full bg-white text-ink disabled:opacity-40">
+            <Minus className="h-3 w-3" />
+          </button>
+          <span className="w-4 text-center tabular-nums text-ink">{goal.minCompleted}</span>
+          <button type="button" aria-label="More required" disabled={goal.minCompleted >= max} onClick={() => onChange({ minCompleted: goal.minCompleted + 1 })} className="grid h-6 w-6 place-items-center rounded-full bg-white text-ink disabled:opacity-40">
+            <Plus className="h-3 w-3" />
+          </button>
+          of {max}
+        </div>
+        <Toggle checked={goal.active} onChange={(active) => onChange({ active })} label={goal.active ? "On" : "Off"} />
       </div>
-      <input aria-label="Completion condition" value={goal.condition} onChange={(e) => onChange({ condition: e.target.value })} className={`${inputClass} mt-2 font-normal`} />
-      <ul className="mt-2 space-y-1.5">
-        {goal.requirements.map((r) => (
-          <li key={r.id} className="flex items-center gap-2">
-            <input aria-label="Requirement" value={r.title} onChange={(e) => setReq(r.id, { title: e.target.value })} className={`${inputClass} h-9 flex-1 font-normal`} />
-            <select aria-label="Requirement effort" value={r.effort} onChange={(e) => setReq(r.id, { effort: e.target.value as "S" | "M" | "L" })} className={`${inputClass} h-9 w-24`}>
-              <option value="S">S · 1</option>
-              <option value="M">M · 2</option>
-              <option value="L">L · 3</option>
+      <Disclosure label="Requirements & workload" summary={goal.requirements.map((r) => r.title).join(", ")} className="mt-1">
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            <select aria-label="Growth area" value={goal.areaId} onChange={(e) => onChange({ areaId: e.target.value as CoreGoal["areaId"] })} className={`${inputClass} h-9 w-auto`}>
+              {SCORED_AREAS.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
             </select>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={goal.requirements.length <= 1}
-              onClick={() => onChange({ requirements: goal.requirements.filter((x) => x.id !== r.id), minCompleted: Math.min(goal.minCompleted, goal.requirements.length - 1) })}
-              aria-label={`Remove ${r.title}`}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          </li>
-        ))}
-      </ul>
-      <div className="mt-2 flex flex-wrap items-center gap-3">
-        <Button size="sm" variant="ghost" onClick={() => onChange({ requirements: [...goal.requirements, { id: uid("req"), title: "New requirement", effort: "M" }] })}>
-          <Plus className="h-3.5 w-3.5" /> Requirement
-        </Button>
-        <label className="flex items-center gap-2 text-xs font-bold text-ink-soft">
-          Minimum completed
-          <input
-            type="number"
-            min={1}
-            max={goal.requirements.length}
-            value={goal.minCompleted}
-            onChange={(e) => onChange({ minCompleted: Math.max(1, Math.min(goal.requirements.length, Number(e.target.value))) })}
-            className="h-8 w-16 rounded-lg border border-twilight/30 bg-white px-2 text-sm font-semibold text-ink"
-          />
-          of {goal.requirements.length}
-        </label>
-      </div>
-    </div>
+            <input aria-label="Completion condition" placeholder="What counts as done?" value={goal.condition} onChange={(e) => onChange({ condition: e.target.value })} className={`${inputClass} h-9 flex-1 font-normal`} />
+          </div>
+          <ul className="space-y-1.5">
+            {goal.requirements.map((r) => (
+              <li key={r.id} className="flex items-center gap-2">
+                <input aria-label="Requirement" value={r.title} onChange={(e) => setReq(r.id, { title: e.target.value })} className={`${inputClass} h-9 flex-1 font-normal`} />
+                <select aria-label="Requirement effort" value={r.effort} onChange={(e) => setReq(r.id, { effort: e.target.value as "S" | "M" | "L" })} className={`${inputClass} h-9 w-24`}>
+                  <option value="S">Small · 1</option>
+                  <option value="M">Medium · 2</option>
+                  <option value="L">Large · 3</option>
+                </select>
+                <button
+                  type="button"
+                  disabled={goal.requirements.length <= 1}
+                  onClick={() => onChange({ requirements: goal.requirements.filter((x) => x.id !== r.id), minCompleted: Math.min(goal.minCompleted, goal.requirements.length - 1) })}
+                  aria-label={`Remove ${r.title}`}
+                  className="text-ink-soft hover:text-ink disabled:opacity-30"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="flex flex-wrap justify-between gap-2">
+            <button type="button" onClick={() => onChange({ requirements: [...goal.requirements, { id: uid("req"), title: "New requirement", effort: "M" }] })} className="inline-flex items-center gap-1 text-xs font-bold text-ink-soft hover:text-ink">
+              <Plus className="h-3 w-3" /> Requirement
+            </button>
+            <button type="button" onClick={onRemove} className="inline-flex items-center gap-1 text-xs font-bold text-ink-soft hover:text-[#a4594b]">
+              <Trash2 className="h-3 w-3" /> Remove goal
+            </button>
+          </div>
+        </div>
+      </Disclosure>
+    </li>
   );
 }

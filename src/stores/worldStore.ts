@@ -29,6 +29,36 @@ export interface DialogRequest {
   resolve: (actionId: string | null) => void;
 }
 
+export type QuickAddKind = "task" | "event" | "exam" | "quran" | "quran-exam";
+
+/** Context already known where Quick Add was opened; never asked again. */
+export interface QuickAddContext {
+  date?: string | null;
+  weekKey?: string;
+  locationId?: LocationId;
+  lessonId?: string | null;
+  eventId?: string | null;
+  quranExamId?: string | null;
+  title?: string;
+  /** Hide the type switcher (e.g. "+ Homework" is always a task). */
+  lockKind?: boolean;
+  /** Label shown in the sheet header, e.g. "for Lesson 3". */
+  label?: string;
+}
+
+export interface QuickAddRequest {
+  kind: QuickAddKind;
+  context: QuickAddContext;
+}
+
+export type EditorKind = "task" | "event" | "quran-session" | "quran-exam";
+export interface EditorRequest {
+  kind: EditorKind;
+  id: string;
+  /** Optional tab to open (e.g. "prep" for exam preparation). */
+  tab?: string;
+}
+
 /** Deep-link targets for views that show one item (lesson, event, exam...). */
 export interface ViewFocus {
   lessonId?: string;
@@ -55,6 +85,8 @@ interface WorldState {
   toast: Toast | null;
   dialog: DialogRequest | null;
   focus: ViewFocus;
+  quickAdd: QuickAddRequest | null;
+  editor: EditorRequest | null;
   systemReducedMotion: boolean;
   settings: AppSettings;
 
@@ -70,6 +102,11 @@ interface WorldState {
   ask: (req: Omit<DialogRequest, "resolve">) => Promise<string | null>;
   closeDialog: (actionId: string | null) => void;
   openView: (view: AppView, focus?: ViewFocus) => void;
+  /** One sheet at a time: opening Quick Add closes an open editor and vice versa. */
+  openQuickAdd: (kind: QuickAddKind, context?: QuickAddContext) => void;
+  closeQuickAdd: () => void;
+  openEditor: (kind: EditorKind, id: string, tab?: string) => void;
+  closeEditor: () => void;
   dismissToast: () => void;
   recenter: () => void;
   setQuestPanelOpen: (open: boolean) => void;
@@ -102,6 +139,8 @@ export const useWorldStore = create<WorldState>()(
       toast: null,
       dialog: null,
       focus: {},
+      quickAdd: null,
+      editor: null,
       systemReducedMotion: false,
       settings: DEFAULT_SETTINGS,
 
@@ -131,6 +170,10 @@ export const useWorldStore = create<WorldState>()(
         d?.resolve(actionId);
       },
       openView: (view, focus = {}) => set({ view, focus }),
+      openQuickAdd: (kind, context = {}) => set({ quickAdd: { kind, context }, editor: null }),
+      closeQuickAdd: () => set({ quickAdd: null }),
+      openEditor: (kind, id, tab) => set({ editor: { kind, id, tab }, quickAdd: null }),
+      closeEditor: () => set({ editor: null }),
       dismissToast: () => set({ toast: null }),
       recenter: () => set((s) => ({ recenterTick: s.recenterTick + 1, selectedLocationId: null })),
       setQuestPanelOpen: (open) => set({ questPanelOpen: open }),
